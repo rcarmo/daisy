@@ -411,6 +411,7 @@ final class SunburstViewModel: ObservableObject {
     @Published private(set) var status: String = "⏳"
     @Published private(set) var statusColor: Color = .gray
     @Published private(set) var changedPaths: Set<String> = []
+    @Published private(set) var removedPaths: Set<String> = []
     @Published private(set) var zoomStack: [DataNode] = []
     
     private var previousSizes: [String: Int64] = [:]
@@ -421,6 +422,7 @@ final class SunburstViewModel: ObservableObject {
         // Track changes
         var newSizes: [String: Int64] = [:]
         var changed: Set<String> = []
+        let previousPaths = Set(previousSizes.keys)
         
         func collectSizes(_ node: DataNode) {
             newSizes[node.path] = node.size
@@ -434,8 +436,11 @@ final class SunburstViewModel: ObservableObject {
             }
         }
         collectSizes(root)
-        
+
+        let removed = previousPaths.subtracting(newSizes.keys)
+
         self.changedPaths = changed
+        self.removedPaths = removed
         self.previousSizes = newSizes
         
         self.root = root
@@ -450,7 +455,7 @@ final class SunburstViewModel: ObservableObject {
             zoomStack = [root]
         }
         
-        status = "✓"
+        status = removed.isEmpty ? "✓" : "✓ −\(removed.count)"
         statusColor = .successGreen
         
         // Clear highlights after delay

@@ -21,6 +21,7 @@ export async function scanDirectory(
     onProgress?: (scanned: number) => void;
     onSnapshot?: (tree: DirNode, scanned: number) => void;
     snapshotEvery?: number;
+    useCache?: boolean;
   } = {},
 ): Promise<DirNode> {
   const {
@@ -29,7 +30,9 @@ export async function scanDirectory(
     onProgress,
     onSnapshot,
     snapshotEvery = 250,
+    useCache = true,
   } = options;
+  const shouldUseCache = useCache && !onSnapshot;
   const absolutePath = resolve(rootPath);
   let scannedCount = 0;
   let rootNode: DirNode | null = null;
@@ -75,7 +78,7 @@ export async function scanDirectory(
 
     // Check cache
     const cached = sizeCache.get(path);
-    if (cached && cached.mtime === stats.mtimeMs) {
+    if (shouldUseCache && cached && cached.mtime === stats.mtimeMs) {
       node.size = cached.size;
       return node;
     }

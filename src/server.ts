@@ -52,6 +52,7 @@ async function performScan(config: Config): Promise<void> {
       maxDepth: config.depth,
       ignore: config.ignore,
       snapshotEvery: config.progressEvery,
+      useCache: !config.watch,
       onProgress: (count) => {
         const now = Date.now();
         if (now - lastProgressAt >= minIntervalMs) {
