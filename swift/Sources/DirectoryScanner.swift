@@ -1,14 +1,34 @@
 import Foundation
 
+/// Lightweight scan result (not MainActor-bound).
+/// Used during scanning, then converted to FileNode for UI.
+struct ScanNode: Sendable {
+    let name: String
+    let path: String
+    let isDirectory: Bool
+    var size: Int64
+    var children: [ScanNode]
+    
+    /// Calculate total size recursively.
+    mutating func calculateSize() -> Int64 {
+        if isDirectory {
+            size = children.reduce(0) { total, child in
+                var mutableChild = child
+                return total + mutableChild.calculateSize()
+            }
+        }
+        return size
+    }
+}
+
 /// Scans directories and builds a FileNode tree.
 ///
 /// This scanner performs recursive directory traversal while respecting
 /// common ignore patterns (node_modules, .git, etc.).
 ///
-/// Progress is reported via Foundation's `Progress` class, which supports
-/// hierarchical progress tracking.
-final class DirectoryScanner {
-    private let fileManager = FileManager.default
+/// Scanning happens off the main thread, then results are converted to
+/// FileNode on MainActor for UI display.
+final class DirectoryScanner: Sendable {
     private let useIgnorePatterns: Bool
     
     /// File and directory names to ignore during scanning.
@@ -29,29 +49,17 @@ final class DirectoryScanner {
     
     /// Scan a directory and return a FileNode tree.
     ///
-    /// Progress is reported via Foundation's `Progress` class. The caller can
-    /// observe `Progress.current()` or pass a parent progress to track scanning.
+    /// Scanning runs on a background thread. Only the final conversion
+    /// to FileNode happens on MainActor.
     ///
     /// - Parameters:
     ///   - path: The absolute path to scan.
     ///   - maxDepth: Maximum recursion depth (default: 10).
-    ///   - parentProgress: Optional parent Progress for hierarchical tracking.
     /// - Returns: A `FileNode` tree, or `nil` if the path is invalid.
-    @MainActor
-    func scan(path: String, maxDepth: Int = 10, parentProgress: Progress? = nil) -> FileNode? {
+    func scan(path: String, maxDepth: Int = 10) async -> FileNode? {
         let url = URL(fileURLWithPath: path)
         let shouldUseIgnore = useIgnorePatterns
-        
-        // Create a progress object for this scan
-        // Using indeterminate since we don't know total count upfront
-        let progress = Progress(totalUnitCount: -1)
-        progress.kind = .file
-        progress.localizedDescription = "Scanning..."
-        
-        // If we have a parent, become a child of it
-        if let parent = parentProgress {
-            parent.addChild(progress, withPendingUnitCount: 1)
-        }
+        let fileManager = FileManager()
         
         func shouldIgnore(_ name: String) -> Bool {
             guard shouldUseIgnore else { return false }
@@ -62,7 +70,7 @@ final class DirectoryScanner {
             return false
         }
         
-        func scanDirectory(_ url: URL, depth: Int, currentProgress: Progress) -> FileNode? {
+        func scanDirectory(_ url: URL, depth: Int) -> ScanNode? {
             let name = url.lastPathComponent
             let path = url.path
             
@@ -76,30 +84,19 @@ final class DirectoryScanner {
                 return nil
             }
             
-            // Update progress
-            currentProgress.completedUnitCount += 1
-            currentProgress.localizedDescription = "Scanning: \(name)"
-            
             if isDirectory.boolValue {
-                // Directory
-                var children: [FileNode] = []
+                var children: [ScanNode] = []
                 
                 if depth < maxDepth {
-                    // Don't skip hidden files - include everything except ignored patterns
                     if let contents = try? fileManager.contentsOfDirectory(
                         at: url,
                         includingPropertiesForKeys: [.fileSizeKey, .isDirectoryKey],
                         options: []
                     ) {
-                        // Create child progress for this directory's contents
-                        let dirProgress = Progress(totalUnitCount: Int64(contents.count))
-                        currentProgress.addChild(dirProgress, withPendingUnitCount: 0)
-                        
                         for childURL in contents {
-                            if let child = scanDirectory(childURL, depth: depth + 1, currentProgress: dirProgress) {
+                            if let child = scanDirectory(childURL, depth: depth + 1) {
                                 children.append(child)
                             }
-                            dirProgress.completedUnitCount += 1
                         }
                     }
                 }
@@ -107,31 +104,57 @@ final class DirectoryScanner {
                 // Sort children by size (descending)
                 children.sort { $0.size > $1.size }
                 
-                let node = FileNode(
+                var node = ScanNode(
                     name: name,
                     path: path,
                     isDirectory: true,
+                    size: 0,
                     children: children
                 )
                 _ = node.calculateSize()
                 return node
             } else {
-                // File - get size
                 var size: Int64 = 0
                 if let attrs = try? fileManager.attributesOfItem(atPath: path),
                    let fileSize = attrs[.size] as? Int64 {
                     size = fileSize
                 }
                 
-                return FileNode(
+                return ScanNode(
                     name: name,
                     path: path,
                     isDirectory: false,
-                    size: size
+                    size: size,
+                    children: []
                 )
             }
         }
         
-        return scanDirectory(url, depth: 0, currentProgress: progress)
+        // Scan on current (background) thread
+        guard var scanResult = scanDirectory(url, depth: 0) else {
+            return nil
+        }
+        _ = scanResult.calculateSize()
+        
+        // Capture as let for Sendable compliance
+        let finalResult = scanResult
+        
+        // Convert to FileNode on MainActor
+        return await MainActor.run {
+            convertToFileNode(finalResult)
+        }
+    }
+    
+    /// Convert ScanNode tree to FileNode tree (must be called on MainActor).
+    @MainActor
+    private func convertToFileNode(_ scan: ScanNode) -> FileNode {
+        let children = scan.children.map { convertToFileNode($0) }
+        return FileNode(
+            name: scan.name,
+            path: scan.path,
+            isDirectory: scan.isDirectory,
+            size: scan.size,
+            children: children
+        )
     }
 }

@@ -59,7 +59,8 @@ final class DirectoryWatcher {
                 let watcher = Unmanaged<DirectoryWatcher>.fromOpaque(info).takeUnretainedValue()
                 
                 // Log event details for debugging
-                if let paths = eventPaths as? [String] {
+                let pathsPtr = unsafeBitCast(eventPaths, to: NSArray.self)
+                if let paths = pathsPtr as? [String] {
                     for (i, p) in paths.prefix(3).enumerated() {
                         print("📁 Event[\(i)]: \(p)")
                     }
