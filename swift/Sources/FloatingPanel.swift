@@ -66,6 +66,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     var watchPath: String = ""
     var maxDepth: Int = 10
     var noIgnore: Bool = false
+    var progressEvery: Int = 250
     
     // MARK: - Application Lifecycle
     
@@ -132,9 +133,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         
         let path = watchPath
         let depth = maxDepth
+        let updateEvery = progressEvery
         
         Task.detached(priority: .userInitiated) { [scanner] in
-            if let tree = await scanner.scan(path: path, maxDepth: depth) {
+            if let tree = await scanner.scanProgressive(
+                path: path,
+                maxDepth: depth,
+                updateEvery: updateEvery,
+                progress: { snapshot in
+                    await MainActor.run { [weak self] in
+                        self?.viewModel.update(root: snapshot)
+                    }
+                }
+            ) {
                 await MainActor.run { [weak self] in
                     self?.viewModel.update(root: tree)
                     print("📊 Scanned \(path): \(formatBytes(tree.size))")

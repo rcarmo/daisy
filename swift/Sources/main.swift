@@ -8,6 +8,7 @@ private enum AppInfo {
     static let version = "0.1.0"
     static let description = "Disk Usage Sunburst Visualizer"
     static let defaultDepth = 10
+    static let defaultProgressEvery = 250
 }
 
 // MARK: - CLI Interface
@@ -21,6 +22,8 @@ private func printUsage() {
     
     Options:
       -d, --depth <n>    Maximum directory depth (default: \(AppInfo.defaultDepth))
+            --progress-every <n>
+                                                 Emit UI updates every N items (default: \(AppInfo.defaultProgressEvery))
       --no-ignore        Disable default ignore patterns
       -h, --help         Show this help message
       -v, --version      Show version
@@ -40,12 +43,13 @@ private func printVersion() {
 }
 
 /// Parse command line arguments.
-/// - Returns: A tuple of (path, depth, noIgnore) or nil if parsing failed.
-private func parseArguments() -> (path: String, depth: Int, noIgnore: Bool)? {
+/// - Returns: A tuple of (path, depth, noIgnore, progressEvery) or nil if parsing failed.
+private func parseArguments() -> (path: String, depth: Int, noIgnore: Bool, progressEvery: Int)? {
     let args = Array(CommandLine.arguments.dropFirst())
     var path: String?
     var depth = AppInfo.defaultDepth
     var noIgnore = false
+    var progressEvery = AppInfo.defaultProgressEvery
     var index = 0
     
     while index < args.count {
@@ -67,6 +71,14 @@ private func parseArguments() -> (path: String, depth: Int, noIgnore: Bool)? {
                 return nil
             }
             depth = d
+
+        case "--progress-every":
+            index += 1
+            guard index < args.count, let v = Int(args[index]), v > 0 else {
+                print("Error: --progress-every requires a positive number")
+                return nil
+            }
+            progressEvery = v
             
         case "--no-ignore":
             noIgnore = true
@@ -97,13 +109,13 @@ private func parseArguments() -> (path: String, depth: Int, noIgnore: Bool)? {
         return nil
     }
     
-    return (resolved, depth, noIgnore)
+    return (resolved, depth, noIgnore, progressEvery)
 }
 
 // MARK: - Entry Point
 
 // Main entry point
-guard let (path, depth, noIgnore) = parseArguments() else {
+guard let (path, depth, noIgnore, progressEvery) = parseArguments() else {
     exit(1)
 }
 
@@ -112,11 +124,13 @@ enum LaunchConfig {
     nonisolated(unsafe) static var watchPath: String = ""
     nonisolated(unsafe) static var maxDepth: Int = 10
     nonisolated(unsafe) static var noIgnore: Bool = false
+    nonisolated(unsafe) static var progressEvery: Int = 250
 }
 
 LaunchConfig.watchPath = path
 LaunchConfig.maxDepth = depth
 LaunchConfig.noIgnore = noIgnore
+LaunchConfig.progressEvery = progressEvery
 
 // Start the app - delegate will be created by NSApplication on main thread
 let app = NSApplication.shared
@@ -127,6 +141,7 @@ DispatchQueue.main.async {
     delegate.watchPath = LaunchConfig.watchPath
     delegate.maxDepth = LaunchConfig.maxDepth
     delegate.noIgnore = LaunchConfig.noIgnore
+    delegate.progressEvery = LaunchConfig.progressEvery
     app.delegate = delegate
     
     // Manually trigger applicationDidFinishLaunching since we set delegate late
