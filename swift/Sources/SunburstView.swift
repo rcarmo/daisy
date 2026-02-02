@@ -70,7 +70,9 @@ struct SunburstView: View {
                                 center: center,
                                 ringWidth: ringWidth
                             ) {
-                                viewModel.revealInFinder(node)
+                                if NSEvent.modifierFlags.contains(.shift) {
+                                    viewModel.revealInFinder(node)
+                                }
                                 if node.isDirectory {
                                     withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
                                         viewModel.zoomTo(node)

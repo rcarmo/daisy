@@ -114,31 +114,19 @@ private func parseArguments() -> (path: String, depth: Int, noIgnore: Bool, prog
 
 // MARK: - Entry Point
 
-// Main entry point
 guard let (path, depth, noIgnore, progressEvery) = parseArguments() else {
     exit(1)
 }
 
-// Store config for AppDelegate to access during launch
-enum LaunchConfig {
-    nonisolated(unsafe) static var watchPath: String = ""
-    nonisolated(unsafe) static var maxDepth: Int = 10
-    nonisolated(unsafe) static var noIgnore: Bool = false
-    nonisolated(unsafe) static var progressEvery: Int = 250
-}
-
-LaunchConfig.watchPath = path
-LaunchConfig.maxDepth = depth
-LaunchConfig.noIgnore = noIgnore
-LaunchConfig.progressEvery = progressEvery
-
-// Start the app
 let app = NSApplication.shared
-let delegate = AppDelegate()
-delegate.watchPath = LaunchConfig.watchPath
-delegate.maxDepth = LaunchConfig.maxDepth
-delegate.noIgnore = LaunchConfig.noIgnore
-delegate.progressEvery = LaunchConfig.progressEvery
-app.delegate = delegate
+
+MainActor.assumeIsolated {
+    let delegate = AppDelegate()
+    delegate.watchPath = path
+    delegate.maxDepth = depth
+    delegate.noIgnore = noIgnore
+    delegate.progressEvery = progressEvery
+    app.delegate = delegate
+}
 
 app.run()
