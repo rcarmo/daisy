@@ -23,7 +23,7 @@ private extension Color {
 /// Sunburst chart view using SwiftUI Canvas for efficient rendering.
 struct SunburstView: View {
     @ObservedObject var viewModel: SunburstViewModel
-    @State private var hoveredNode: FileNode?
+    @State private var hoveredNode: DataNode?
     @State private var mouseLocation: CGPoint = .zero
     @State private var isHovering: Bool = false
     
@@ -93,7 +93,7 @@ struct SunburstView: View {
     // MARK: - Subviews
     
     @ViewBuilder
-    private func sunburstCanvas(root: FileNode, center: CGPoint, ringWidth: CGFloat) -> some View {
+    private func sunburstCanvas(root: DataNode, center: CGPoint, ringWidth: CGFloat) -> some View {
         Canvas { context, _ in
             drawNode(
                 context: context,
@@ -108,7 +108,7 @@ struct SunburstView: View {
     }
     
     @ViewBuilder
-    private func centerLabel(root: FileNode, center: CGPoint) -> some View {
+    private func centerLabel(root: DataNode, center: CGPoint) -> some View {
         VStack(spacing: 2) {
             Text(formatBytes(root.size))
                 .font(.system(size: 16, weight: .bold))
@@ -133,7 +133,7 @@ struct SunburstView: View {
     }
     
     @ViewBuilder
-    private func hoverTooltip(for node: FileNode) -> some View {
+    private func hoverTooltip(for node: DataNode) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(node.name)
                 .font(.system(size: 11, weight: .semibold))
@@ -192,7 +192,7 @@ struct SunburstView: View {
     
     private func drawNode(
         context: GraphicsContext,
-        node: FileNode,
+        node: DataNode,
         center: CGPoint,
         startAngle: Double,
         endAngle: Double,
@@ -312,10 +312,10 @@ struct SunburstView: View {
     /// Find which node is under the given point.
     private func hitTest(
         location: CGPoint,
-        root: FileNode,
+        root: DataNode,
         center: CGPoint,
         ringWidth: CGFloat
-    ) -> FileNode? {
+    ) -> DataNode? {
         // Convert to polar coordinates
         let dx = location.x - center.x
         let dy = location.y - center.y
@@ -349,11 +349,11 @@ struct SunburstView: View {
     private func findNodeAt(
         angle: Double,
         targetDepth: Int,
-        node: FileNode,
+        node: DataNode,
         startAngle: Double,
         endAngle: Double,
         currentDepth: Int
-    ) -> FileNode? {
+    ) -> DataNode? {
         guard currentDepth <= SunburstConfig.maxDepth else { return nil }
         guard !node.children.isEmpty else { return nil }
         
@@ -406,23 +406,23 @@ struct SunburstView: View {
 /// Manages the file tree state, zoom navigation, and change tracking.
 @MainActor
 final class SunburstViewModel: ObservableObject {
-    @Published private(set) var root: FileNode?
-    @Published private(set) var viewRoot: FileNode?
+    @Published private(set) var root: DataNode?
+    @Published private(set) var viewRoot: DataNode?
     @Published private(set) var status: String = "⏳"
     @Published private(set) var statusColor: Color = .gray
     @Published private(set) var changedPaths: Set<String> = []
-    @Published private(set) var zoomStack: [FileNode] = []
+    @Published private(set) var zoomStack: [DataNode] = []
     
     private var previousSizes: [String: Int64] = [:]
     
     // MARK: - Public Methods
     
-    func update(root: FileNode) {
+    func update(root: DataNode) {
         // Track changes
         var newSizes: [String: Int64] = [:]
         var changed: Set<String> = []
         
-        func collectSizes(_ node: FileNode) {
+        func collectSizes(_ node: DataNode) {
             newSizes[node.path] = node.size
             if let oldSize = previousSizes[node.path], oldSize != node.size {
                 changed.insert(node.path)
@@ -466,7 +466,7 @@ final class SunburstViewModel: ObservableObject {
         statusColor = .yellow
     }
     
-    func zoomTo(_ node: FileNode) {
+    func zoomTo(_ node: DataNode) {
         guard node.isDirectory else { return }
         zoomStack.append(node)
         viewRoot = node
@@ -478,7 +478,7 @@ final class SunburstViewModel: ObservableObject {
         viewRoot = zoomStack.last
     }
     
-    private func findNode(in root: FileNode, path: String) -> FileNode? {
+    private func findNode(in root: DataNode, path: String) -> DataNode? {
         if root.path == path { return root }
         for child in root.children {
             if let found = findNode(in: child, path: path) {
