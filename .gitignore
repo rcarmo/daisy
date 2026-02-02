@@ -10,6 +10,10 @@ daisy
 daisy-*
 *.exe
 
+# Swift
+swift/.build/
+swift/.swiftpm/
+
 # IDE
 .idea/
 .vscode/

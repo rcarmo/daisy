@@ -2,7 +2,7 @@
 
 A live disk usage sunburst visualizer built with Bun. Watch your filesystem in real-time with an interactive radial treemap.
 
-> **Note**: This project was created as a demonstration of AI-assisted, SPEC driven development speed to annoy a couple of curmudgeons. The entire application went from [SPEC.md](SPEC.md) to working MVP in approximately **10 minutes** using GitHub Copilot. That includes asking it to copy the `skel` prompts from [`agentbox`](https://github.com/rcarmo/agentbox), and it took me more effort to take the screenshots and tweak this README than to build the actual app...
+> **Note**: This project was created as a demonstration of AI-assisted, SPEC driven development speed to annoy a couple of curmudgeons. The Bun application went from [SPEC.md](SPEC.md) to working MVP in approximately **10 minutes** using GitHub Copilot. That includes asking it to copy the `skel` prompts from [`agentbox`](https://github.com/rcarmo/agentbox), and it took me more effort to take the screenshots and tweak this README than to build the actual app... Then it took it **3 minutes** to add the native SwiftUI version (see [swift/README.md](swift/README.md), which took me a while to add the new screenshot to).
 
 ![Sunburst Visualization](docs/screenshot.png)
 

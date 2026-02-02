@@ -90,7 +90,31 @@ check: lint typecheck test ## Run standard validation pipeline
 
 .PHONY: clean
 clean: ## Remove build artifacts
-	rm -rf node_modules .turbo coverage dist
+	rm -rf node_modules .turbo coverage dist swift/.build
 
 clean-dist: ## Remove only dist folder
 	rm -rf dist
+
+# =============================================================================
+# Swift version
+# =============================================================================
+
+.PHONY: swift-build
+swift-build: ## Build Swift version
+	cd swift && swift build -c release
+	@mkdir -p dist
+	@cp swift/.build/release/daisy dist/daisy-swift
+	@echo "Built: dist/daisy-swift"
+	@ls -lh dist/daisy-swift
+
+.PHONY: swift-run
+swift-run: ## Run Swift version (use ARGS for path, e.g., make swift-run ARGS="~/Documents")
+	cd swift && swift run daisy $(ARGS)
+
+.PHONY: swift-dev
+swift-dev: ## Run Swift version on current directory
+	cd swift && swift run daisy ..
+
+.PHONY: swift-clean
+swift-clean: ## Clean Swift build
+	cd swift && swift package clean
