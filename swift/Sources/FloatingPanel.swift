@@ -147,7 +147,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     await MainActor.run { [weak self] in
                         guard let self, self.scanGeneration == currentGeneration else { return }
                         withAnimation(.easeInOut(duration: 0.2)) {
-                            self?.viewModel.updateSnapshot(root: snapshot)
+                            self.viewModel.updateSnapshot(root: snapshot)
                         }
                     }
                 }
@@ -155,7 +155,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 await MainActor.run { [weak self] in
                     guard let self, self.scanGeneration == currentGeneration else { return }
                     withAnimation(.easeInOut(duration: 0.25)) {
-                        self?.viewModel.updateFinal(root: tree)
+                        self.viewModel.updateFinal(root: tree)
                     }
                     print("📊 Scanned \(path): \(formatBytes(tree.size))")
                 }
