@@ -49,12 +49,19 @@ export interface ScanningEvent {
   progress: number;
 }
 
+/** SSE event for partial tree snapshots during scanning */
+export interface SnapshotEvent {
+  type: "snapshot";
+  data: DirNode;
+}
+
 /** Union of all SSE event types */
 export type SSEEvent =
   | FullUpdateEvent
   | DeltaUpdateEvent
   | ErrorEvent
-  | ScanningEvent;
+  | ScanningEvent
+  | SnapshotEvent;
 
 /** CLI configuration options */
 export interface Config {
@@ -64,6 +71,8 @@ export interface Config {
   port: number;
   /** Maximum directory depth to scan */
   depth: number;
+  /** Emit UI updates every N items */
+  progressEvery: number;
   /** Patterns to ignore */
   ignore: string[];
   /** Whether to open browser automatically */

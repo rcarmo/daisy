@@ -21,6 +21,7 @@ Usage: daisy [options] <path>
 Options:
   -p, --port <number>     Server port (default: 3210)
   -d, --depth <number>    Max directory depth to scan (default: 10)
+  --progress-every <n>    Emit UI updates every N items (default: 250)
   -i, --ignore <pattern>  Ignore patterns (can be repeated)
   --no-ignore             Disable default ignore patterns
   -o, --open              Open browser automatically
@@ -52,6 +53,7 @@ function parseCliArgs(): Config {
     options: {
       port: { type: "string", short: "p", default: "3210" },
       depth: { type: "string", short: "d", default: "10" },
+      "progress-every": { type: "string", default: "250" },
       ignore: { type: "string", short: "i", multiple: true },
       "no-ignore": { type: "boolean", default: false },
       open: { type: "boolean", short: "o", default: false },
@@ -69,6 +71,7 @@ function parseCliArgs(): Config {
   const path = positionals[0] ?? ".";
   const port = Number.parseInt(values.port ?? "3210", 10);
   const depth = Number.parseInt(values.depth ?? "10", 10);
+  const progressEvery = Number.parseInt(values["progress-every"] ?? "250", 10);
 
   if (Number.isNaN(port) || port < 1 || port > 65535) {
     console.error("Error: Invalid port number");
@@ -80,10 +83,16 @@ function parseCliArgs(): Config {
     process.exit(1);
   }
 
+  if (Number.isNaN(progressEvery) || progressEvery < 1) {
+    console.error("Error: Invalid --progress-every value");
+    process.exit(1);
+  }
+
   return {
     path: resolve(path),
     port,
     depth,
+    progressEvery,
     ignore: values["no-ignore"]
       ? [...(values.ignore ?? [])]
       : [...DEFAULT_IGNORE, ...(values.ignore ?? [])],

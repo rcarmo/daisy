@@ -212,6 +212,53 @@ function findNode(root, targetPath) {
 }
 
 /**
+ * Build zoom stack from root to a target path.
+ */
+function buildZoomStack(root, targetPath) {
+  if (!targetPath) return [root];
+
+  const stack = [];
+
+  function walk(node) {
+    stack.push(node);
+    if (node.path === targetPath) return true;
+    if (node.children) {
+      for (const child of node.children) {
+        if (targetPath.startsWith(child.path)) {
+          if (walk(child)) return true;
+        }
+      }
+    }
+    stack.pop();
+    return false;
+  }
+
+  if (walk(root)) return stack;
+  return [root];
+}
+
+/**
+ * Apply a new tree update while preserving zoom when possible.
+ */
+function applyTreeUpdate(tree, setConnected) {
+  const previousViewPath = zoomStack.length > 0 ? zoomStack[zoomStack.length - 1].path : null;
+  currentTree = tree;
+
+  if (previousViewPath) {
+    zoomStack = buildZoomStack(currentTree, previousViewPath);
+    const viewRoot = zoomStack[zoomStack.length - 1];
+    renderSunburst(currentTree, viewRoot);
+  } else {
+    zoomStack = [currentTree];
+    renderSunburst(currentTree);
+  }
+
+  if (setConnected) {
+    setStatus('connected', 'Connected');
+  }
+}
+
+/**
  * Zoom to a specific node
  */
 function zoomTo(node) {
@@ -298,10 +345,11 @@ function connect() {
       
       switch (data.type) {
         case 'full':
-          currentTree = data.data;
-          zoomStack = [currentTree];
-          renderSunburst(currentTree);
-          setStatus('connected', 'Connected');
+          applyTreeUpdate(data.data, true);
+          break;
+
+        case 'snapshot':
+          applyTreeUpdate(data.data, false);
           break;
           
         case 'scanning':

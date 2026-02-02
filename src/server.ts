@@ -47,8 +47,12 @@ async function performScan(config: Config): Promise<void> {
     currentTree = await scanDirectory(config.path, {
       maxDepth: config.depth,
       ignore: config.ignore,
+      snapshotEvery: config.progressEvery,
       onProgress: (count) => {
         broadcast({ type: "scanning", progress: count });
+      },
+      onSnapshot: (tree) => {
+        broadcast({ type: "snapshot", data: tree });
       },
     });
 

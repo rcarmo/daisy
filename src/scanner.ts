@@ -19,46 +19,69 @@ export async function scanDirectory(
     maxDepth?: number;
     ignore?: string[];
     onProgress?: (scanned: number) => void;
+    onSnapshot?: (tree: DirNode, scanned: number) => void;
+    snapshotEvery?: number;
   } = {},
 ): Promise<DirNode> {
-  const { maxDepth = 10, ignore = [], onProgress } = options;
+  const {
+    maxDepth = 10,
+    ignore = [],
+    onProgress,
+    onSnapshot,
+    snapshotEvery = 250,
+  } = options;
   const absolutePath = resolve(rootPath);
   let scannedCount = 0;
+  let rootNode: DirNode | null = null;
+
+  function emitProgress(): void {
+    if (onProgress && scannedCount % 100 === 0) {
+      onProgress(scannedCount);
+    }
+  }
+
+  function emitSnapshot(): void {
+    if (!onSnapshot || snapshotEvery < 1) return;
+    if (scannedCount % snapshotEvery === 0 && rootNode) {
+      onSnapshot(rootNode, scannedCount);
+    }
+  }
 
   async function scan(path: string, depth: number): Promise<DirNode> {
     const stats = await stat(path);
     const name = path.split("/").pop() ?? path;
+    const isDirectory = stats.isDirectory();
 
-    scannedCount++;
-    if (onProgress && scannedCount % 100 === 0) {
-      onProgress(scannedCount);
+    const node: DirNode = {
+      name,
+      path,
+      size: isDirectory ? 0 : stats.size,
+      isDirectory,
+      depth,
+      children: isDirectory ? [] : undefined,
+    };
+
+    if (depth === 0 && !rootNode) {
+      rootNode = node;
     }
 
-    if (!stats.isDirectory()) {
-      return {
-        name,
-        path,
-        size: stats.size,
-        isDirectory: false,
-        depth,
-      };
+    scannedCount++;
+    emitProgress();
+    emitSnapshot();
+
+    if (!isDirectory) {
+      return node;
     }
 
     // Check cache
     const cached = sizeCache.get(path);
     if (cached && cached.mtime === stats.mtimeMs) {
-      return {
-        name,
-        path,
-        size: cached.size,
-        isDirectory: true,
-        depth,
-        children: [], // Children not cached, would need full rescan
-      };
+      node.size = cached.size;
+      return node;
     }
 
     // Scan directory contents
-    const children: DirNode[] = [];
+    const children = node.children ?? [];
     let totalSize = 0;
 
     if (depth < maxDepth) {
@@ -73,6 +96,8 @@ export async function scanDirectory(
             const childNode = await scan(childPath, depth + 1);
             children.push(childNode);
             totalSize += childNode.size;
+            node.size = totalSize;
+            emitSnapshot();
           } catch {
             // Skip inaccessible files/directories
           }
@@ -88,14 +113,9 @@ export async function scanDirectory(
     // Update cache
     sizeCache.set(path, { size: totalSize, mtime: stats.mtimeMs });
 
-    return {
-      name,
-      path,
-      size: totalSize,
-      isDirectory: true,
-      children,
-      depth,
-    };
+    node.size = totalSize;
+    node.children = children;
+    return node;
   }
 
   return scan(absolutePath, 0);
