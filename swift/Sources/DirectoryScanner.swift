@@ -4,6 +4,9 @@ import Foundation
 ///
 /// This scanner performs recursive directory traversal while respecting
 /// common ignore patterns (node_modules, .git, etc.).
+///
+/// Progress is reported via Foundation's `Progress` class, which supports
+/// hierarchical progress tracking.
 final class DirectoryScanner {
     private let fileManager = FileManager.default
     private let useIgnorePatterns: Bool
@@ -26,16 +29,29 @@ final class DirectoryScanner {
     
     /// Scan a directory and return a FileNode tree.
     ///
+    /// Progress is reported via Foundation's `Progress` class. The caller can
+    /// observe `Progress.current()` or pass a parent progress to track scanning.
+    ///
     /// - Parameters:
     ///   - path: The absolute path to scan.
     ///   - maxDepth: Maximum recursion depth (default: 10).
-    ///   - progress: Optional callback reporting item count during scan.
+    ///   - parentProgress: Optional parent Progress for hierarchical tracking.
     /// - Returns: A `FileNode` tree, or `nil` if the path is invalid.
     @MainActor
-    func scan(path: String, maxDepth: Int = 10, progress: ((Int) -> Void)? = nil) -> FileNode? {
+    func scan(path: String, maxDepth: Int = 10, parentProgress: Progress? = nil) -> FileNode? {
         let url = URL(fileURLWithPath: path)
-        var itemCount = 0
         let shouldUseIgnore = useIgnorePatterns
+        
+        // Create a progress object for this scan
+        // Using indeterminate since we don't know total count upfront
+        let progress = Progress(totalUnitCount: -1)
+        progress.kind = .file
+        progress.localizedDescription = "Scanning..."
+        
+        // If we have a parent, become a child of it
+        if let parent = parentProgress {
+            parent.addChild(progress, withPendingUnitCount: 1)
+        }
         
         func shouldIgnore(_ name: String) -> Bool {
             guard shouldUseIgnore else { return false }
@@ -46,7 +62,7 @@ final class DirectoryScanner {
             return false
         }
         
-        func scanDirectory(_ url: URL, depth: Int) -> FileNode? {
+        func scanDirectory(_ url: URL, depth: Int, currentProgress: Progress) -> FileNode? {
             let name = url.lastPathComponent
             let path = url.path
             
@@ -60,10 +76,9 @@ final class DirectoryScanner {
                 return nil
             }
             
-            itemCount += 1
-            if itemCount % 100 == 0 {
-                progress?(itemCount)
-            }
+            // Update progress
+            currentProgress.completedUnitCount += 1
+            currentProgress.localizedDescription = "Scanning: \(name)"
             
             if isDirectory.boolValue {
                 // Directory
@@ -76,10 +91,15 @@ final class DirectoryScanner {
                         includingPropertiesForKeys: [.fileSizeKey, .isDirectoryKey],
                         options: []
                     ) {
+                        // Create child progress for this directory's contents
+                        let dirProgress = Progress(totalUnitCount: Int64(contents.count))
+                        currentProgress.addChild(dirProgress, withPendingUnitCount: 0)
+                        
                         for childURL in contents {
-                            if let child = scanDirectory(childURL, depth: depth + 1) {
+                            if let child = scanDirectory(childURL, depth: depth + 1, currentProgress: dirProgress) {
                                 children.append(child)
                             }
+                            dirProgress.completedUnitCount += 1
                         }
                     }
                 }
@@ -112,6 +132,6 @@ final class DirectoryScanner {
             }
         }
         
-        return scanDirectory(url, depth: 0)
+        return scanDirectory(url, depth: 0, currentProgress: progress)
     }
 }

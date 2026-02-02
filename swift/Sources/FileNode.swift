@@ -46,21 +46,19 @@ final class FileNode: Identifiable, ObservableObject {
     }
 }
 
-/// Format bytes to human-readable string.
+// MARK: - Formatting
+
+/// Shared ByteCountFormatter for consistent size formatting.
+private let byteCountFormatter: ByteCountFormatter = {
+    let formatter = ByteCountFormatter()
+    formatter.allowedUnits = [.useBytes, .useKB, .useMB, .useGB, .useTB, .usePB]
+    formatter.countStyle = .file
+    return formatter
+}()
+
+/// Format bytes to human-readable string using Foundation's ByteCountFormatter.
 /// - Parameter bytes: The byte count to format.
 /// - Returns: A human-readable string like "1.5 GB".
 func formatBytes(_ bytes: Int64) -> String {
-    let units = ["B", "KB", "MB", "GB", "TB", "PB"]
-    var size = Double(bytes)
-    var unitIndex = 0
-    
-    while size >= 1024, unitIndex < units.count - 1 {
-        size /= 1024
-        unitIndex += 1
-    }
-    
-    if unitIndex == 0 {
-        return "\(Int(size)) \(units[unitIndex])"
-    }
-    return String(format: "%.1f %@", size, units[unitIndex])
+    byteCountFormatter.string(fromByteCount: bytes)
 }
