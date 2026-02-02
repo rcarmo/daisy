@@ -132,20 +132,13 @@ LaunchConfig.maxDepth = depth
 LaunchConfig.noIgnore = noIgnore
 LaunchConfig.progressEvery = progressEvery
 
-// Start the app - delegate will be created by NSApplication on main thread
+// Start the app
 let app = NSApplication.shared
-
-// Schedule delegate creation on main run loop before app.run() processes events
-DispatchQueue.main.async {
-    let delegate = AppDelegate()
-    delegate.watchPath = LaunchConfig.watchPath
-    delegate.maxDepth = LaunchConfig.maxDepth
-    delegate.noIgnore = LaunchConfig.noIgnore
-    delegate.progressEvery = LaunchConfig.progressEvery
-    app.delegate = delegate
-    
-    // Manually trigger applicationDidFinishLaunching since we set delegate late
-    delegate.applicationDidFinishLaunching(Notification(name: NSApplication.didFinishLaunchingNotification))
-}
+let delegate = AppDelegate()
+delegate.watchPath = LaunchConfig.watchPath
+delegate.maxDepth = LaunchConfig.maxDepth
+delegate.noIgnore = LaunchConfig.noIgnore
+delegate.progressEvery = LaunchConfig.progressEvery
+app.delegate = delegate
 
 app.run()
