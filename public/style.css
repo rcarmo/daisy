@@ -128,13 +128,19 @@ main {
   stroke: var(--bg-color);
   stroke-width: 1px;
   cursor: pointer;
-  transition: opacity 0.2s;
+  transition: opacity 0.2s, stroke 0.2s, stroke-width 0.2s;
 }
 
 #sunburst path.removed {
   stroke: #f38ba8;
   stroke-width: 2px;
   opacity: 0.9;
+}
+
+#sunburst path.added {
+  stroke: #a6e3a1;
+  stroke-width: 2px;
+  opacity: 0.95;
 }
 
 #sunburst path:hover {

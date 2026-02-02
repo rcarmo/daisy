@@ -143,14 +143,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 progress: { snapshot in
                     await MainActor.run { [weak self] in
                         withAnimation(.easeInOut(duration: 0.2)) {
-                            self?.viewModel.update(root: snapshot)
+                            self?.viewModel.updateSnapshot(root: snapshot)
                         }
                     }
                 }
             ) {
                 await MainActor.run { [weak self] in
                     withAnimation(.easeInOut(duration: 0.25)) {
-                        self?.viewModel.update(root: tree)
+                        self?.viewModel.updateFinal(root: tree)
                     }
                     print("📊 Scanned \(path): \(formatBytes(tree.size))")
                 }

@@ -5,11 +5,13 @@
 
 // State
 let currentTree = null;
-let previousTree = null;
+let lastFullTree = null;
 let zoomStack = [];
 let eventSource = null;
 let removedHighlightPaths = new Set();
 let removedHighlightTimer = null;
+let addedHighlightPaths = new Set();
+let addedHighlightTimer = null;
 
 // DOM Elements
 const svg = document.getElementById('sunburst');
@@ -136,6 +138,9 @@ function renderSunburst(root, zoomRoot = null) {
       if (removedHighlightPaths.has(child.path)) {
         path.classList.add('removed');
       }
+      if (addedHighlightPaths.has(child.path)) {
+        path.classList.add('added');
+      }
       path.dataset.path = child.path;
       path.dataset.name = child.name;
       path.dataset.size = child.size;
@@ -249,6 +254,25 @@ function computeRemovedPaths(prev, next) {
 }
 
 /**
+ * Compute added paths between two trees.
+ */
+function computeAddedPaths(prev, next) {
+  if (!prev || !next) return [];
+
+  const prevPaths = new Set();
+  const nextPaths = new Set();
+
+  collectPaths(prev, prevPaths);
+  collectPaths(next, nextPaths);
+
+  const added = [];
+  for (const path of nextPaths) {
+    if (!prevPaths.has(path)) added.push(path);
+  }
+  return added;
+}
+
+/**
  * Build a set of existing parent paths for removed items.
  */
 function buildRemovedHighlightPaths(removed, nextTree) {
@@ -301,12 +325,15 @@ function buildZoomStack(root, targetPath) {
 /**
  * Apply a new tree update while preserving zoom when possible.
  */
-function applyTreeUpdate(tree, setConnected) {
+function applyTreeUpdate(tree, setConnected, trackRemovals) {
   const previousViewPath = zoomStack.length > 0 ? zoomStack[zoomStack.length - 1].path : null;
-  const removed = computeRemovedPaths(previousTree, tree);
+  const removed = trackRemovals ? computeRemovedPaths(lastFullTree, tree) : [];
+  const added = trackRemovals ? computeAddedPaths(lastFullTree, tree) : [];
 
   currentTree = tree;
-  previousTree = tree;
+  if (trackRemovals) {
+    lastFullTree = tree;
+  }
 
   svg.classList.add('updating');
 
@@ -328,6 +355,16 @@ function applyTreeUpdate(tree, setConnected) {
     if (removedHighlightTimer) clearTimeout(removedHighlightTimer);
     removedHighlightTimer = setTimeout(() => {
       removedHighlightPaths = new Set();
+      const viewRoot = zoomStack.length > 0 ? zoomStack[zoomStack.length - 1] : currentTree;
+      renderSunburst(currentTree, viewRoot);
+    }, 1500);
+  }
+
+  if (added.length > 0) {
+    addedHighlightPaths = new Set(added);
+    if (addedHighlightTimer) clearTimeout(addedHighlightTimer);
+    addedHighlightTimer = setTimeout(() => {
+      addedHighlightPaths = new Set();
       const viewRoot = zoomStack.length > 0 ? zoomStack[zoomStack.length - 1] : currentTree;
       renderSunburst(currentTree, viewRoot);
     }, 1500);
@@ -425,11 +462,11 @@ function connect() {
       
       switch (data.type) {
         case 'full':
-          applyTreeUpdate(data.data, true);
+          applyTreeUpdate(data.data, true, true);
           break;
 
         case 'snapshot':
-          applyTreeUpdate(data.data, false);
+          applyTreeUpdate(data.data, false, false);
           break;
           
         case 'scanning':

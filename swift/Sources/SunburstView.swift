@@ -233,7 +233,8 @@ struct SunburstView: View {
                 startAngle: currentAngle,
                 depth: depth,
                 isChanged: viewModel.changedPaths.contains(child.path),
-                isRemoved: viewModel.removedHighlightPaths.contains(child.path)
+                isRemoved: viewModel.removedHighlightPaths.contains(child.path),
+                isAdded: viewModel.addedHighlightPaths.contains(child.path)
             )
             context.fill(path, with: .color(color))
             context.stroke(path, with: .color(Color.backgroundDark), lineWidth: 1)
@@ -289,7 +290,7 @@ struct SunburstView: View {
         return path
     }
     
-    private func getColor(startAngle: Double, depth: Int, isChanged: Bool, isRemoved: Bool) -> Color {
+    private func getColor(startAngle: Double, depth: Int, isChanged: Bool, isRemoved: Bool, isAdded: Bool) -> Color {
         let hue = startAngle / 360.0
         
         // Convert from HSL (used in Bun) to approximate HSB values
@@ -301,6 +302,9 @@ struct SunburstView: View {
         if isRemoved {
             saturation = 0.85
             brightness = 0.85
+        } else if isAdded {
+            saturation = 0.85
+            brightness = 0.98
         } else if isChanged {
             saturation = 0.85
             brightness = 0.95
@@ -421,13 +425,14 @@ final class SunburstViewModel: ObservableObject {
     @Published private(set) var changedPaths: Set<String> = []
     @Published private(set) var removedPaths: Set<String> = []
     @Published private(set) var removedHighlightPaths: Set<String> = []
+    @Published private(set) var addedHighlightPaths: Set<String> = []
     @Published private(set) var zoomStack: [DataNode] = []
     
     private var previousSizes: [String: Int64] = [:]
     
     // MARK: - Public Methods
     
-    func update(root: DataNode) {
+    func updateFinal(root: DataNode) {
         // Track changes
         var newSizes: [String: Int64] = [:]
         var changed: Set<String> = []
@@ -447,11 +452,14 @@ final class SunburstViewModel: ObservableObject {
         collectSizes(root)
 
         let removed = previousPaths.subtracting(newSizes.keys)
+        let added = previousSizes.isEmpty ? Set<String>() : Set(newSizes.keys).subtracting(previousPaths)
         let removedHighlights = buildRemovedHighlightPaths(removed, existingPaths: Set(newSizes.keys))
+        let addedHighlights = buildAddedHighlightPaths(added)
 
         self.changedPaths = changed
         self.removedPaths = removed
         self.removedHighlightPaths = removedHighlights
+        self.addedHighlightPaths = addedHighlights
         self.previousSizes = newSizes
         
         self.root = root
@@ -466,15 +474,31 @@ final class SunburstViewModel: ObservableObject {
             zoomStack = [root]
         }
         
-        status = removed.isEmpty ? "✓" : "✓ −\(removed.count)"
+        let removedLabel = removed.isEmpty ? "" : " −\(removed.count)"
+        let addedLabel = added.isEmpty ? "" : " +\(added.count)"
+        status = "✓\(addedLabel)\(removedLabel)"
         statusColor = .successGreen
         
         // Clear highlights after delay
-        if !changed.isEmpty || !removedHighlights.isEmpty {
+        if !changed.isEmpty || !removedHighlights.isEmpty || !addedHighlights.isEmpty {
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
                 self?.changedPaths = []
                 self?.removedHighlightPaths = []
+                self?.addedHighlightPaths = []
             }
+        }
+    }
+
+    func updateSnapshot(root: DataNode) {
+        self.root = root
+
+        if let currentView = viewRoot,
+           let newView = findNode(in: root, path: currentView.path) {
+            viewRoot = newView
+            zoomStack = zoomStack.compactMap { findNode(in: root, path: $0.path) }
+        } else {
+            viewRoot = root
+            zoomStack = [root]
         }
     }
     
@@ -524,5 +548,10 @@ final class SunburstViewModel: ObservableObject {
         }
 
         return highlights
+    }
+
+    private func buildAddedHighlightPaths(_ added: Set<String>) -> Set<String> {
+        guard !added.isEmpty else { return [] }
+        return added
     }
 }
