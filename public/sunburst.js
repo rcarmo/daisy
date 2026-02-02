@@ -244,6 +244,8 @@ function applyTreeUpdate(tree, setConnected) {
   const previousViewPath = zoomStack.length > 0 ? zoomStack[zoomStack.length - 1].path : null;
   currentTree = tree;
 
+  svg.classList.add('updating');
+
   if (previousViewPath) {
     zoomStack = buildZoomStack(currentTree, previousViewPath);
     const viewRoot = zoomStack[zoomStack.length - 1];
@@ -256,6 +258,10 @@ function applyTreeUpdate(tree, setConnected) {
   if (setConnected) {
     setStatus('connected', 'Connected');
   }
+
+  requestAnimationFrame(() => {
+    svg.classList.remove('updating');
+  });
 }
 
 /**

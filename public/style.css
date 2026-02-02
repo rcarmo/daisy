@@ -116,6 +116,12 @@ main {
 #sunburst {
   width: 100%;
   height: 100%;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+#sunburst.updating {
+  opacity: 0.88;
+  transform: scale(0.995);
 }
 
 #sunburst path {

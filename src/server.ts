@@ -43,16 +43,28 @@ function broadcast(event: SSEEvent): void {
 async function performScan(config: Config): Promise<void> {
   broadcast({ type: "scanning", progress: 0 });
 
+  let lastProgressAt = 0;
+  let lastSnapshotAt = 0;
+  const minIntervalMs = 200;
+
   try {
     currentTree = await scanDirectory(config.path, {
       maxDepth: config.depth,
       ignore: config.ignore,
       snapshotEvery: config.progressEvery,
       onProgress: (count) => {
-        broadcast({ type: "scanning", progress: count });
+        const now = Date.now();
+        if (now - lastProgressAt >= minIntervalMs) {
+          lastProgressAt = now;
+          broadcast({ type: "scanning", progress: count });
+        }
       },
       onSnapshot: (tree) => {
-        broadcast({ type: "snapshot", data: tree });
+        const now = Date.now();
+        if (now - lastSnapshotAt >= minIntervalMs) {
+          lastSnapshotAt = now;
+          broadcast({ type: "snapshot", data: tree });
+        }
       },
     });
 

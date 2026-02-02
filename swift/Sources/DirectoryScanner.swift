@@ -161,6 +161,8 @@ final class DirectoryScanner: Sendable {
         let fileManager = FileManager()
         var processedCount = 0
         var rootNode: MutableNode?
+        var lastEmitTime = Date.distantPast
+        let minEmitInterval: TimeInterval = 0.2
 
         func shouldIgnore(_ name: String) -> Bool {
             guard shouldUseIgnore else { return false }
@@ -174,6 +176,9 @@ final class DirectoryScanner: Sendable {
         func maybeEmitProgress() async {
             guard updateEvery > 0, processedCount % updateEvery == 0,
                   let rootNode else { return }
+            let now = Date()
+            guard now.timeIntervalSince(lastEmitTime) >= minEmitInterval else { return }
+            lastEmitTime = now
             await progress(rootNode.toImmutable())
         }
 
@@ -207,7 +212,6 @@ final class DirectoryScanner: Sendable {
                             if let child = await scanDirectory(childURL, depth: depth + 1) {
                                 node.children.append(child)
                                 node.size += child.size
-                                processedCount += 1
                                 await maybeEmitProgress()
                             }
                         }
