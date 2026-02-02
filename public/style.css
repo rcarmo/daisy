@@ -22,6 +22,14 @@ body {
   flex-direction: column;
 }
 
+#info-panel {
+  cursor: pointer;
+}
+
+#info-panel:hover {
+  background: rgba(255, 255, 255, 0.02);
+}
+
 #app {
   display: flex;
   flex-direction: column;

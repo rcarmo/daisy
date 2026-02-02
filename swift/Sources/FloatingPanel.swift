@@ -76,6 +76,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         panel = FloatingPanel(contentRect: WindowConfig.defaultSize, viewModel: viewModel)
         panel?.center()
         panel?.makeKeyAndOrderFront(nil)
+
+        viewModel.onRescan = { [weak self] in
+            self?.performScan()
+        }
         
         // Start scanning if path was set
         if !watchPath.isEmpty {

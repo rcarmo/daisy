@@ -26,6 +26,7 @@ const tooltipName = document.getElementById('tooltip-name');
 const tooltipSize = document.getElementById('tooltip-size');
 const tooltipPath = document.getElementById('tooltip-path');
 const breadcrumb = document.getElementById('breadcrumb');
+const infoPanel = document.getElementById('info-panel');
 
 // Configuration
 const config = {
@@ -501,6 +502,14 @@ async function rescan() {
 
 // Event listeners
 rescanBtn.addEventListener('click', rescan);
+infoPanel.addEventListener('click', (e) => {
+  const target = e.target;
+  if (target instanceof HTMLElement) {
+    if (target.closest('#breadcrumb')) return;
+    if (target.closest('#rescan-btn')) return;
+  }
+  rescan();
+});
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape' || e.key === 'Backspace') {
     zoomOut();

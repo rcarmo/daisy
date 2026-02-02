@@ -184,6 +184,9 @@ struct SunburstView: View {
                 .background(Color.panelBackground)
                 .cornerRadius(6)
                 .animation(.easeInOut(duration: 0.2), value: viewModel.status)
+                .onTapGesture {
+                    viewModel.requestRescan()
+                }
             }
         }
         .padding(8)
@@ -427,6 +430,8 @@ final class SunburstViewModel: ObservableObject {
     @Published private(set) var removedHighlightPaths: Set<String> = []
     @Published private(set) var addedHighlightPaths: Set<String> = []
     @Published private(set) var zoomStack: [DataNode] = []
+
+    var onRescan: (() -> Void)?
     
     private var previousSizes: [String: Int64] = [:]
     
@@ -500,6 +505,10 @@ final class SunburstViewModel: ObservableObject {
             viewRoot = root
             zoomStack = [root]
         }
+    }
+
+    func requestRescan() {
+        onRescan?()
     }
     
     func setScanning() {
