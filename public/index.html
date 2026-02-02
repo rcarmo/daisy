@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Daisy - Disk Usage Visualizer</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="app">
+    <main>
+      <div id="chart-container">
+        <svg id="sunburst" viewBox="-400 -400 800 800"></svg>
+        <div id="center-label">
+          <div id="center-size">-</div>
+          <div id="center-name">-</div>
+        </div>
+      </div>
+      
+      <div id="tooltip" class="hidden">
+        <div id="tooltip-name"></div>
+        <div id="tooltip-size"></div>
+        <div id="tooltip-path"></div>
+      </div>
+    </main>
+    
+    <div id="info-panel">
+      <div id="panel-header">
+        <span>🌼 Daisy</span>
+        <button id="rescan-btn" title="Rescan">🔄</button>
+      </div>
+      <div id="panel-content">
+        <div id="path">-</div>
+        <div id="total-size">-</div>
+        <div id="breadcrumb"></div>
+      </div>
+      <div id="status">
+        <span id="status-text">Connecting...</span>
+      </div>
+    </div>
+  </div>
+  
+  <script src="sunburst.js"></script>
+</body>
+</html>
