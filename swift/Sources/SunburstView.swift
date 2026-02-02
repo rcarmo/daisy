@@ -23,6 +23,8 @@ private extension Color {
 /// Sunburst chart view using SwiftUI Canvas for efficient rendering.
 struct SunburstView: View {
     @ObservedObject var viewModel: SunburstViewModel
+    @State private var hoveredNode: FileNode?
+    @State private var mouseLocation: CGPoint = .zero
     
     var body: some View {
         GeometryReader { geometry in
@@ -36,7 +38,37 @@ struct SunburstView: View {
                 
                 if let root = viewModel.viewRoot {
                     sunburstCanvas(root: root, center: center, ringWidth: ringWidth)
+                        .onContinuousHover { phase in
+                            switch phase {
+                            case .active(let location):
+                                mouseLocation = location
+                                hoveredNode = hitTest(
+                                    location: location,
+                                    root: root,
+                                    center: center,
+                                    ringWidth: ringWidth
+                                )
+                            case .ended:
+                                hoveredNode = nil
+                            }
+                        }
+                        .onTapGesture { location in
+                            if let node = hitTest(
+                                location: location,
+                                root: root,
+                                center: center,
+                                ringWidth: ringWidth
+                            ), node.isDirectory {
+                                viewModel.zoomTo(node)
+                            }
+                        }
+                    
                     centerLabel(root: root, center: center)
+                }
+                
+                // Hover tooltip
+                if let node = hoveredNode {
+                    hoverTooltip(for: node)
                 }
                 
                 infoPanel
@@ -79,6 +111,33 @@ struct SunburstView: View {
         .onTapGesture {
             viewModel.zoomOut()
         }
+    }
+    
+    @ViewBuilder
+    private func hoverTooltip(for node: FileNode) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(node.name)
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundColor(.white)
+                .lineLimit(1)
+            Text(formatBytes(node.size))
+                .font(.system(size: 10))
+                .foregroundColor(.accentBlue)
+            if node.isDirectory {
+                Text("\(node.children.count) items")
+                    .font(.system(size: 9))
+                    .foregroundColor(.gray)
+            }
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 6)
+        .background(Color.panelBackground)
+        .cornerRadius(6)
+        .shadow(color: .black.opacity(0.3), radius: 4, x: 0, y: 2)
+        .position(
+            x: min(max(mouseLocation.x + 60, 80), NSScreen.main?.frame.width ?? 500 - 80),
+            y: max(mouseLocation.y - 30, 40)
+        )
     }
     
     @ViewBuilder
@@ -207,6 +266,97 @@ struct SunburstView: View {
         let saturation = isChanged ? 0.9 : max(0.3, 0.7 - Double(depth) * 0.1)
         let brightness = isChanged ? 0.85 : min(0.7, 0.45 + Double(depth) * 0.05)
         return Color(hue: hue, saturation: saturation, brightness: brightness)
+    }
+    
+    // MARK: - Hit Testing
+    
+    /// Find which node is under the given point.
+    private func hitTest(
+        location: CGPoint,
+        root: FileNode,
+        center: CGPoint,
+        ringWidth: CGFloat
+    ) -> FileNode? {
+        // Convert to polar coordinates
+        let dx = location.x - center.x
+        let dy = location.y - center.y
+        let distance = sqrt(dx * dx + dy * dy)
+        
+        // Check if inside the chart area
+        let maxRadius = SunburstConfig.innerRadius + CGFloat(SunburstConfig.maxDepth) * ringWidth
+        guard distance >= SunburstConfig.innerRadius && distance <= maxRadius else {
+            return nil
+        }
+        
+        // Calculate angle (0-360, starting from top)
+        var angle = atan2(dx, -dy) * 180 / .pi
+        if angle < 0 { angle += 360 }
+        
+        // Calculate depth from distance
+        let depth = Int((distance - SunburstConfig.innerRadius) / ringWidth) + 1
+        
+        // Search for the node at this angle and depth
+        return findNodeAt(
+            angle: angle,
+            targetDepth: depth,
+            node: root,
+            startAngle: 0,
+            endAngle: 360,
+            currentDepth: 1
+        )
+    }
+    
+    /// Recursively find the node at a given angle and depth.
+    private func findNodeAt(
+        angle: Double,
+        targetDepth: Int,
+        node: FileNode,
+        startAngle: Double,
+        endAngle: Double,
+        currentDepth: Int
+    ) -> FileNode? {
+        guard currentDepth <= SunburstConfig.maxDepth else { return nil }
+        guard !node.children.isEmpty else { return nil }
+        
+        var currentAngle = startAngle
+        let angleRange = endAngle - startAngle
+        
+        for child in node.children {
+            guard child.size > 0 else { continue }
+            
+            let childAngle = (Double(child.size) / Double(node.size)) * angleRange
+            let childEndAngle = currentAngle + childAngle
+            
+            // Skip tiny segments
+            guard childAngle >= SunburstConfig.minAngleForDisplay else {
+                currentAngle = childEndAngle
+                continue
+            }
+            
+            // Check if angle is in this segment
+            if angle >= currentAngle && angle < childEndAngle {
+                // Found the segment at this depth
+                if currentDepth == targetDepth {
+                    return child
+                }
+                // Need to go deeper
+                if child.isDirectory {
+                    return findNodeAt(
+                        angle: angle,
+                        targetDepth: targetDepth,
+                        node: child,
+                        startAngle: currentAngle,
+                        endAngle: childEndAngle,
+                        currentDepth: currentDepth + 1
+                    )
+                }
+                return nil
+            }
+            
+            currentAngle = childEndAngle
+        }
+        
+        return nil
     }
 }
 
