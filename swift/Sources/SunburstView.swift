@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 // MARK: - Configuration
@@ -68,9 +69,12 @@ struct SunburstView: View {
                                 root: root,
                                 center: center,
                                 ringWidth: ringWidth
-                            ), node.isDirectory {
-                                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                                    viewModel.zoomTo(node)
+                            ) {
+                                viewModel.revealInFinder(node)
+                                if node.isDirectory {
+                                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                                        viewModel.zoomTo(node)
+                                    }
                                 }
                             }
                         }
@@ -526,6 +530,11 @@ final class SunburstViewModel: ObservableObject {
         guard zoomStack.count > 1 else { return }
         zoomStack.removeLast()
         viewRoot = zoomStack.last
+    }
+
+    func revealInFinder(_ node: DataNode) {
+        let url = URL(fileURLWithPath: node.path)
+        NSWorkspace.shared.activateFileViewerSelecting([url])
     }
     
     private func findNode(in root: DataNode, path: String) -> DataNode? {

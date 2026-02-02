@@ -428,6 +428,13 @@ function handleMouseMove(e) {
 
 function handleClick(e) {
   const path = e.target;
+  const targetPath = path.dataset.path;
+  if (!targetPath) return;
+
+  fetch(`/api/reveal?path=${encodeURIComponent(targetPath)}`).catch((err) => {
+    console.error('Reveal failed:', err);
+  });
+
   if (path.dataset.isDirectory === 'true') {
     zoomTo(path.dataset.path);
   }

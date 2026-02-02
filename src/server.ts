@@ -176,6 +176,30 @@ export function startServer(config: Config): void {
         });
       }
 
+      if (path === "/api/reveal") {
+        const targetPath = url.searchParams.get("path");
+        if (!targetPath) {
+          return new Response(JSON.stringify({ error: "Missing path" }), {
+            status: 400,
+            headers: { "Content-Type": "application/json" },
+          });
+        }
+
+        const absolutePath = resolve(targetPath);
+        const platform = process.platform;
+        if (platform === "darwin") {
+          Bun.spawn(["open", "-R", absolutePath], { stdio: ["ignore", "ignore", "ignore"] });
+        } else if (platform === "win32") {
+          Bun.spawn(["cmd", "/c", "start", "", absolutePath], { stdio: ["ignore", "ignore", "ignore"] });
+        } else {
+          Bun.spawn(["xdg-open", absolutePath], { stdio: ["ignore", "ignore", "ignore"] });
+        }
+
+        return new Response(JSON.stringify({ status: "ok" }), {
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+
       if (path === "/api/rescan") {
         performScan(config);
         return new Response(JSON.stringify({ status: "scanning" }), {
