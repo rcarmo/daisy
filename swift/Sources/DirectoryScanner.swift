@@ -6,6 +6,7 @@ import Foundation
 /// common ignore patterns (node_modules, .git, etc.).
 final class DirectoryScanner {
     private let fileManager = FileManager.default
+    private let useIgnorePatterns: Bool
     
     /// File and directory names to ignore during scanning.
     private static let ignoredNames: Set<String> = [
@@ -16,6 +17,12 @@ final class DirectoryScanner {
     
     /// File suffixes to ignore (e.g., swap files).
     private static let ignoredSuffixes: [String] = [".swp", ".swo"]
+    
+    /// Creates a new directory scanner.
+    /// - Parameter ignorePatterns: If true, disables default ignore patterns.
+    init(ignorePatterns: Bool = false) {
+        self.useIgnorePatterns = !ignorePatterns
+    }
     
     /// Scan a directory and return a FileNode tree.
     ///
@@ -28,8 +35,10 @@ final class DirectoryScanner {
     func scan(path: String, maxDepth: Int = 10, progress: ((Int) -> Void)? = nil) -> FileNode? {
         let url = URL(fileURLWithPath: path)
         var itemCount = 0
+        let shouldUseIgnore = useIgnorePatterns
         
         func shouldIgnore(_ name: String) -> Bool {
+            guard shouldUseIgnore else { return false }
             if Self.ignoredNames.contains(name) { return true }
             for suffix in Self.ignoredSuffixes where name.hasSuffix(suffix) {
                 return true

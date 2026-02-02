@@ -38,6 +38,7 @@ Options:
   -p, --port <number>     Server port (default: 3210)
   -d, --depth <number>    Max directory depth to scan (default: 10)
   -i, --ignore <pattern>  Ignore patterns (can be repeated)
+  --no-ignore             Disable default ignore patterns
   -o, --open              Open browser automatically
   -w, --watch             Enable file watching (default: true)
   --no-watch              Disable file watching
@@ -48,6 +49,7 @@ Examples:
   daisy .
   daisy ~/Documents --port 8080 --depth 5
   daisy /var/log -i "*.tmp" -i "node_modules"
+  daisy ~/Downloads --no-ignore
 ```
 
 ## Development
@@ -78,12 +80,12 @@ make check
 
 ## API
 
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/` | GET | Web viewer |
-| `/api/tree` | GET | Current directory tree as JSON |
-| `/api/events` | GET | SSE stream for real-time updates |
-| `/api/info` | GET | Server info and settings |
+| Endpoint     | Method | Description                      |
+| ------------ | ------ | -------------------------------- |
+| `/`          | GET    | Web viewer                       |
+| `/api/tree`  | GET    | Current directory tree as JSON   |
+| `/api/events`| GET    | SSE stream for real-time updates |
+| `/api/info`  | GET    | Server info and settings         |
 
 ## License
 

@@ -60,11 +60,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     
     private(set) var panel: FloatingPanel?
     private let viewModel = SunburstViewModel()
-    private let scanner = DirectoryScanner()
+    private var scanner: DirectoryScanner?
     private var watcher: DirectoryWatcher?
     
     var watchPath: String = ""
     var maxDepth: Int = 10
+    var noIgnore: Bool = false
     
     // MARK: - Application Lifecycle
     
@@ -91,7 +92,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let resolvedPath = (path as NSString).expandingTildeInPath
         watchPath = resolvedPath
         
-        print("🌼 Daisy - Watching: \(resolvedPath)")
+        // Create scanner with ignore setting
+        scanner = DirectoryScanner(ignorePatterns: noIgnore)
+        
+        print("🌼 Daisy - Watching: \(resolvedPath)\(noIgnore ? " (no ignore)" : "")")
         
         // Initial scan
         performScan()
@@ -109,6 +113,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     
     /// Perform a directory scan and update the view.
     func performScan() {
+        guard let scanner else { return }
+        
         viewModel.setScanning()
         
         let path = watchPath

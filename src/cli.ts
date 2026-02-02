@@ -22,6 +22,7 @@ Options:
   -p, --port <number>     Server port (default: 3210)
   -d, --depth <number>    Max directory depth to scan (default: 10)
   -i, --ignore <pattern>  Ignore patterns (can be repeated)
+  --no-ignore             Disable default ignore patterns
   -o, --open              Open browser automatically
   -w, --watch             Enable file watching (default: true)
   --no-watch              Disable file watching
@@ -32,6 +33,7 @@ Examples:
   daisy .
   daisy ~/Documents --port 8080 --depth 5
   daisy /var/log -i "*.tmp" -i "node_modules"
+  daisy ~/Downloads --no-ignore
 `;
 
 function printHelp(): void {
@@ -51,6 +53,7 @@ function parseCliArgs(): Config {
       port: { type: "string", short: "p", default: "3210" },
       depth: { type: "string", short: "d", default: "10" },
       ignore: { type: "string", short: "i", multiple: true },
+      "no-ignore": { type: "boolean", default: false },
       open: { type: "boolean", short: "o", default: false },
       watch: { type: "boolean", short: "w", default: true },
       "no-watch": { type: "boolean", default: false },
@@ -81,7 +84,9 @@ function parseCliArgs(): Config {
     path: resolve(path),
     port,
     depth,
-    ignore: [...DEFAULT_IGNORE, ...(values.ignore ?? [])],
+    ignore: values["no-ignore"]
+      ? [...(values.ignore ?? [])]
+      : [...DEFAULT_IGNORE, ...(values.ignore ?? [])],
     open: values.open ?? false,
     watch: values["no-watch"] ? false : (values.watch ?? true),
   };
@@ -96,9 +101,9 @@ async function openBrowser(url: string): Promise<void> {
   };
 
   const cmd = commands[platform];
-  if (cmd) {
+  if (cmd && cmd.length > 0) {
     const [command, ...args] = cmd;
-    Bun.spawn([command, ...args], { stdio: ["ignore", "ignore", "ignore"] });
+    Bun.spawn([command as string, ...args], { stdio: ["ignore", "ignore", "ignore"] });
   }
 }
 

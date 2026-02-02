@@ -21,6 +21,7 @@ private func printUsage() {
     
     Options:
       -d, --depth <n>    Maximum directory depth (default: \(AppInfo.defaultDepth))
+      --no-ignore        Disable default ignore patterns
       -h, --help         Show this help message
       -v, --version      Show version
     
@@ -28,6 +29,7 @@ private func printUsage() {
       daisy .
       daisy ~/Documents
       daisy /var/log --depth 5
+      daisy ~/Downloads --no-ignore
     """
     print(usage)
 }
@@ -38,11 +40,12 @@ private func printVersion() {
 }
 
 /// Parse command line arguments.
-/// - Returns: A tuple of (path, depth) or nil if parsing failed.
-private func parseArguments() -> (path: String, depth: Int)? {
+/// - Returns: A tuple of (path, depth, noIgnore) or nil if parsing failed.
+private func parseArguments() -> (path: String, depth: Int, noIgnore: Bool)? {
     let args = Array(CommandLine.arguments.dropFirst())
     var path: String?
     var depth = AppInfo.defaultDepth
+    var noIgnore = false
     var index = 0
     
     while index < args.count {
@@ -64,6 +67,9 @@ private func parseArguments() -> (path: String, depth: Int)? {
                 return nil
             }
             depth = d
+            
+        case "--no-ignore":
+            noIgnore = true
             
         default:
             if arg.hasPrefix("-") {
@@ -91,13 +97,13 @@ private func parseArguments() -> (path: String, depth: Int)? {
         return nil
     }
     
-    return (resolved, depth)
+    return (resolved, depth, noIgnore)
 }
 
 // MARK: - Entry Point
 
 // Main entry point
-guard let (path, depth) = parseArguments() else {
+guard let (path, depth, noIgnore) = parseArguments() else {
     exit(1)
 }
 
@@ -108,6 +114,7 @@ Task { @MainActor in
     let delegate = AppDelegate()
     delegate.watchPath = path
     delegate.maxDepth = depth
+    delegate.noIgnore = noIgnore
     app.delegate = delegate
 }
 
