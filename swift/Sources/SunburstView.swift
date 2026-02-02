@@ -25,6 +25,7 @@ struct SunburstView: View {
     @ObservedObject var viewModel: SunburstViewModel
     @State private var hoveredNode: FileNode?
     @State private var mouseLocation: CGPoint = .zero
+    @State private var isHovering: Bool = false
     
     var body: some View {
         GeometryReader { geometry in
@@ -42,14 +43,23 @@ struct SunburstView: View {
                             switch phase {
                             case .active(let location):
                                 mouseLocation = location
-                                hoveredNode = hitTest(
+                                let newHovered = hitTest(
                                     location: location,
                                     root: root,
                                     center: center,
                                     ringWidth: ringWidth
                                 )
+                                if newHovered?.path != hoveredNode?.path {
+                                    withAnimation(.easeOut(duration: 0.15)) {
+                                        hoveredNode = newHovered
+                                        isHovering = newHovered != nil
+                                    }
+                                }
                             case .ended:
-                                hoveredNode = nil
+                                withAnimation(.easeOut(duration: 0.2)) {
+                                    hoveredNode = nil
+                                    isHovering = false
+                                }
                             }
                         }
                         .onTapGesture { location in
@@ -59,7 +69,9 @@ struct SunburstView: View {
                                 center: center,
                                 ringWidth: ringWidth
                             ), node.isDirectory {
-                                viewModel.zoomTo(node)
+                                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                                    viewModel.zoomTo(node)
+                                }
                             }
                         }
                     
@@ -69,10 +81,12 @@ struct SunburstView: View {
                 // Hover tooltip
                 if let node = hoveredNode {
                     hoverTooltip(for: node)
+                        .transition(.opacity.combined(with: .scale(scale: 0.95)))
                 }
                 
                 infoPanel
             }
+            .animation(.easeInOut(duration: 0.25), value: viewModel.viewRoot?.path)
         }
     }
     
@@ -107,10 +121,15 @@ struct SunburstView: View {
         .frame(width: SunburstConfig.innerRadius * 1.8, height: SunburstConfig.innerRadius * 1.8)
         .background(Color.backgroundDark)
         .clipShape(Circle())
+        .scaleEffect(viewModel.zoomStack.count > 1 ? 1.0 : 0.95)
+        .shadow(color: .black.opacity(0.2), radius: 8, x: 0, y: 2)
         .position(center)
         .onTapGesture {
-            viewModel.zoomOut()
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                viewModel.zoomOut()
+            }
         }
+        .animation(.spring(response: 0.3, dampingFraction: 0.8), value: root.size)
     }
     
     @ViewBuilder
@@ -138,6 +157,7 @@ struct SunburstView: View {
             x: min(max(mouseLocation.x + 60, 80), NSScreen.main?.frame.width ?? 500 - 80),
             y: max(mouseLocation.y - 30, 40)
         )
+        .animation(.interactiveSpring(response: 0.15, dampingFraction: 0.8), value: mouseLocation)
     }
     
     @ViewBuilder
@@ -149,6 +169,7 @@ struct SunburstView: View {
                     Text(formatBytes(root.size))
                         .font(.system(size: 11, weight: .semibold))
                         .foregroundColor(.accentBlue)
+                        .contentTransition(.numericText())
                     Text(root.path)
                         .font(.system(size: 9))
                         .foregroundColor(.gray)
@@ -156,11 +177,13 @@ struct SunburstView: View {
                     Text(viewModel.status)
                         .font(.system(size: 10))
                         .foregroundColor(viewModel.statusColor)
+                        .id(viewModel.status)  // Force re-render for animation
                 }
                 .padding(.horizontal, 8)
                 .padding(.vertical, 4)
                 .background(Color.panelBackground)
                 .cornerRadius(6)
+                .animation(.easeInOut(duration: 0.2), value: viewModel.status)
             }
         }
         .padding(8)
@@ -263,8 +286,24 @@ struct SunburstView: View {
     
     private func getColor(startAngle: Double, depth: Int, isChanged: Bool) -> Color {
         let hue = startAngle / 360.0
-        let saturation = isChanged ? 0.9 : max(0.3, 0.7 - Double(depth) * 0.1)
-        let brightness = isChanged ? 0.85 : min(0.7, 0.45 + Double(depth) * 0.05)
+        
+        // Convert from HSL (used in Bun) to approximate HSB values
+        // Bun uses: saturation 70-30%, lightness 45-70%
+        // For HSB: higher saturation and brightness for vivid colors
+        let saturation: Double
+        let brightness: Double
+        
+        if isChanged {
+            saturation = 0.85
+            brightness = 0.95
+        } else {
+            // Match Bun's HSL appearance with HSB
+            // Outer rings (depth 1): more saturated, brighter
+            // Inner rings (higher depth): less saturated, slightly less bright
+            saturation = max(0.50, 0.80 - Double(depth) * 0.05)
+            brightness = min(0.95, 0.75 + Double(depth) * 0.03)
+        }
+        
         return Color(hue: hue, saturation: saturation, brightness: brightness)
     }
     
@@ -372,8 +411,8 @@ final class SunburstViewModel: ObservableObject {
     @Published private(set) var status: String = "⏳"
     @Published private(set) var statusColor: Color = .gray
     @Published private(set) var changedPaths: Set<String> = []
+    @Published private(set) var zoomStack: [FileNode] = []
     
-    private var zoomStack: [FileNode] = []
     private var previousSizes: [String: Int64] = [:]
     
     // MARK: - Public Methods
