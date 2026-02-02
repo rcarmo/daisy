@@ -15,6 +15,9 @@ const clients = new Set<ReadableStreamDefaultController<Uint8Array>>();
 /** Current directory tree */
 let currentTree: DirNode | null = null;
 
+/** Scan generation to prevent out-of-order updates */
+let scanGeneration = 0;
+
 /** Server start time */
 let startedAt: Date;
 
@@ -43,6 +46,9 @@ function broadcast(event: SSEEvent): void {
 async function performScan(config: Config): Promise<void> {
   broadcast({ type: "scanning", progress: 0 });
 
+  scanGeneration += 1;
+  const currentGeneration = scanGeneration;
+
   let lastProgressAt = 0;
   let lastSnapshotAt = 0;
   const minIntervalMs = 200;
@@ -54,6 +60,7 @@ async function performScan(config: Config): Promise<void> {
       snapshotEvery: config.progressEvery,
       useCache: !config.watch,
       onProgress: (count) => {
+        if (currentGeneration !== scanGeneration) return;
         const now = Date.now();
         if (now - lastProgressAt >= minIntervalMs) {
           lastProgressAt = now;
@@ -61,6 +68,7 @@ async function performScan(config: Config): Promise<void> {
         }
       },
       onSnapshot: (tree) => {
+        if (currentGeneration !== scanGeneration) return;
         const now = Date.now();
         if (now - lastSnapshotAt >= minIntervalMs) {
           lastSnapshotAt = now;
@@ -68,6 +76,8 @@ async function performScan(config: Config): Promise<void> {
         }
       },
     });
+
+    if (currentGeneration !== scanGeneration) return;
 
     broadcast({ type: "full", data: currentTree });
     console.log(`📊 Scanned ${config.path}: ${formatBytes(currentTree.size)}`);

@@ -62,6 +62,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let viewModel = SunburstViewModel()
     private var scanner: DirectoryScanner?
     private var watcher: DirectoryWatcher?
+    private var scanGeneration: Int = 0
     
     var watchPath: String = ""
     var maxDepth: Int = 10
@@ -134,6 +135,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let path = watchPath
         let depth = maxDepth
         let updateEvery = progressEvery
+        scanGeneration += 1
+        let currentGeneration = scanGeneration
         
         Task.detached(priority: .userInitiated) { [scanner] in
             if let tree = await scanner.scanProgressive(
@@ -142,6 +145,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 updateEvery: updateEvery,
                 progress: { snapshot in
                     await MainActor.run { [weak self] in
+                        guard let self, self.scanGeneration == currentGeneration else { return }
                         withAnimation(.easeInOut(duration: 0.2)) {
                             self?.viewModel.updateSnapshot(root: snapshot)
                         }
@@ -149,6 +153,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 }
             ) {
                 await MainActor.run { [weak self] in
+                    guard let self, self.scanGeneration == currentGeneration else { return }
                     withAnimation(.easeInOut(duration: 0.25)) {
                         self?.viewModel.updateFinal(root: tree)
                     }
