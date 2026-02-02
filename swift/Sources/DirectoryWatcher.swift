@@ -42,29 +42,47 @@ final class DirectoryWatcher {
             copyDescription: nil
         )
         
+        // Flags for file-level events and recursive watching
         let flags = UInt32(
             kFSEventStreamCreateFlagUseCFTypes |
             kFSEventStreamCreateFlagFileEvents |
-            kFSEventStreamCreateFlagNoDefer
+            kFSEventStreamCreateFlagNoDefer |
+            kFSEventStreamCreateFlagWatchRoot
         )
+        
+        print("🔧 FSEvents: Creating stream for path: \(path)")
         
         stream = FSEventStreamCreate(
             nil,
-            { _, info, numEvents, _, _, _ in
+            { _, info, numEvents, eventPaths, eventFlags, _ in
                 guard let info else { return }
                 let watcher = Unmanaged<DirectoryWatcher>.fromOpaque(info).takeUnretainedValue()
+                
+                // Log event details for debugging
+                if let paths = eventPaths as? [String] {
+                    for (i, p) in paths.prefix(3).enumerated() {
+                        print("📁 Event[\(i)]: \(p)")
+                    }
+                    if paths.count > 3 {
+                        print("📁 ... and \(paths.count - 3) more events")
+                    }
+                }
+                
                 watcher.handleEvents(count: numEvents)
             },
             &context,
             pathsToWatch,
             FSEventStreamEventId(kFSEventStreamEventIdSinceNow),
-            0.3,
+            0.5, // latency
             flags
         )
         
         if let stream {
             FSEventStreamSetDispatchQueue(stream, DispatchQueue.main)
-            FSEventStreamStart(stream)
+            let started = FSEventStreamStart(stream)
+            print("🔧 FSEvents: Stream started = \(started)")
+        } else {
+            print("❌ FSEvents: Failed to create stream!")
         }
     }
     
@@ -85,8 +103,12 @@ final class DirectoryWatcher {
         // Debounce rapid events
         pendingWork?.cancel()
         
+        print("📡 FSEvents received: \(count) events")
+        
         let work = DispatchWorkItem { [weak self] in
-            self?.callback()
+            guard let self else { return }
+            print("⚡ Debounce complete, triggering callback")
+            self.callback()
         }
         
         pendingWork = work

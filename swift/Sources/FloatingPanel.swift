@@ -89,19 +89,32 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// Start watching a directory for changes.
     /// - Parameter path: The absolute path to watch.
     func startWatching(path: String) {
-        let resolvedPath = (path as NSString).expandingTildeInPath
-        watchPath = resolvedPath
+        // Resolve to absolute path (handles ~, .., relative paths)
+        let expandedPath = (path as NSString).expandingTildeInPath
+        let absolutePath = (expandedPath as NSString).standardizingPath
+        let resolvedPath: String
+        
+        if absolutePath.hasPrefix("/") {
+            resolvedPath = absolutePath
+        } else {
+            // Relative path - resolve from current directory
+            resolvedPath = FileManager.default.currentDirectoryPath + "/" + absolutePath
+        }
+        
+        // Normalize the path (resolve ../ etc)
+        let url = URL(fileURLWithPath: resolvedPath).standardized
+        watchPath = url.path
         
         // Create scanner with ignore setting
         scanner = DirectoryScanner(ignorePatterns: noIgnore)
         
-        print("🌼 Daisy - Watching: \(resolvedPath)\(noIgnore ? " (no ignore)" : "")")
+        print("🌼 Daisy - Watching: \(watchPath)\(noIgnore ? " (no ignore)" : "")")
         
         // Initial scan
         performScan()
         
-        // Set up watcher
-        watcher = DirectoryWatcher(path: resolvedPath) { [weak self] in
+        // Set up watcher with ABSOLUTE path (required for FSEvents)
+        watcher = DirectoryWatcher(path: watchPath) { [weak self] in
             print("📁 Change detected, rescanning...")
             Task { @MainActor in
                 self?.performScan()
