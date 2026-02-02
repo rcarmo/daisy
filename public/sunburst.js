@@ -5,8 +5,11 @@
 
 // State
 let currentTree = null;
+let previousTree = null;
 let zoomStack = [];
 let eventSource = null;
+let removedHighlightPaths = new Set();
+let removedHighlightTimer = null;
 
 // DOM Elements
 const svg = document.getElementById('sunburst');
@@ -130,6 +133,9 @@ function renderSunburst(root, zoomRoot = null) {
       const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
       path.setAttribute('d', describeArc(0, 0, innerR, outerR, currentAngle, childEndAngle));
       path.setAttribute('fill', getColor(currentAngle, depth));
+      if (removedHighlightPaths.has(child.path)) {
+        path.classList.add('removed');
+      }
       path.dataset.path = child.path;
       path.dataset.name = child.name;
       path.dataset.size = child.size;
@@ -212,6 +218,61 @@ function findNode(root, targetPath) {
 }
 
 /**
+ * Collect all paths in a tree into a set.
+ */
+function collectPaths(node, set) {
+  set.add(node.path);
+  if (node.children) {
+    for (const child of node.children) {
+      collectPaths(child, set);
+    }
+  }
+}
+
+/**
+ * Compute removed paths between two trees.
+ */
+function computeRemovedPaths(prev, next) {
+  if (!prev || !next) return [];
+
+  const prevPaths = new Set();
+  const nextPaths = new Set();
+
+  collectPaths(prev, prevPaths);
+  collectPaths(next, nextPaths);
+
+  const removed = [];
+  for (const path of prevPaths) {
+    if (!nextPaths.has(path)) removed.push(path);
+  }
+  return removed;
+}
+
+/**
+ * Build a set of existing parent paths for removed items.
+ */
+function buildRemovedHighlightPaths(removed, nextTree) {
+  const highlights = new Set();
+  if (!removed.length || !nextTree) return highlights;
+
+  const nextPaths = new Set();
+  collectPaths(nextTree, nextPaths);
+
+  for (const removedPath of removed) {
+    let current = removedPath;
+    while (current.includes('/')) {
+      current = current.substring(0, current.lastIndexOf('/')) || '/';
+      if (nextPaths.has(current)) {
+        highlights.add(current);
+      }
+      if (current === '/') break;
+    }
+  }
+
+  return highlights;
+}
+
+/**
  * Build zoom stack from root to a target path.
  */
 function buildZoomStack(root, targetPath) {
@@ -242,7 +303,10 @@ function buildZoomStack(root, targetPath) {
  */
 function applyTreeUpdate(tree, setConnected) {
   const previousViewPath = zoomStack.length > 0 ? zoomStack[zoomStack.length - 1].path : null;
+  const removed = computeRemovedPaths(previousTree, tree);
+
   currentTree = tree;
+  previousTree = tree;
 
   svg.classList.add('updating');
 
@@ -257,6 +321,16 @@ function applyTreeUpdate(tree, setConnected) {
 
   if (setConnected) {
     setStatus('connected', 'Connected');
+  }
+
+  if (removed.length > 0) {
+    removedHighlightPaths = buildRemovedHighlightPaths(removed, currentTree);
+    if (removedHighlightTimer) clearTimeout(removedHighlightTimer);
+    removedHighlightTimer = setTimeout(() => {
+      removedHighlightPaths = new Set();
+      const viewRoot = zoomStack.length > 0 ? zoomStack[zoomStack.length - 1] : currentTree;
+      renderSunburst(currentTree, viewRoot);
+    }, 1500);
   }
 
   requestAnimationFrame(() => {

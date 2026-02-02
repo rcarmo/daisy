@@ -229,7 +229,12 @@ struct SunburstView: View {
                 endAngle: childEndAngle
             )
             
-            let color = getColor(startAngle: currentAngle, depth: depth, isChanged: viewModel.changedPaths.contains(child.path))
+            let color = getColor(
+                startAngle: currentAngle,
+                depth: depth,
+                isChanged: viewModel.changedPaths.contains(child.path),
+                isRemoved: viewModel.removedHighlightPaths.contains(child.path)
+            )
             context.fill(path, with: .color(color))
             context.stroke(path, with: .color(Color.backgroundDark), lineWidth: 1)
             
@@ -284,7 +289,7 @@ struct SunburstView: View {
         return path
     }
     
-    private func getColor(startAngle: Double, depth: Int, isChanged: Bool) -> Color {
+    private func getColor(startAngle: Double, depth: Int, isChanged: Bool, isRemoved: Bool) -> Color {
         let hue = startAngle / 360.0
         
         // Convert from HSL (used in Bun) to approximate HSB values
@@ -293,7 +298,10 @@ struct SunburstView: View {
         let saturation: Double
         let brightness: Double
         
-        if isChanged {
+        if isRemoved {
+            saturation = 0.85
+            brightness = 0.85
+        } else if isChanged {
             saturation = 0.85
             brightness = 0.95
         } else {
@@ -412,6 +420,7 @@ final class SunburstViewModel: ObservableObject {
     @Published private(set) var statusColor: Color = .gray
     @Published private(set) var changedPaths: Set<String> = []
     @Published private(set) var removedPaths: Set<String> = []
+    @Published private(set) var removedHighlightPaths: Set<String> = []
     @Published private(set) var zoomStack: [DataNode] = []
     
     private var previousSizes: [String: Int64] = [:]
@@ -438,9 +447,11 @@ final class SunburstViewModel: ObservableObject {
         collectSizes(root)
 
         let removed = previousPaths.subtracting(newSizes.keys)
+        let removedHighlights = buildRemovedHighlightPaths(removed, existingPaths: Set(newSizes.keys))
 
         self.changedPaths = changed
         self.removedPaths = removed
+        self.removedHighlightPaths = removedHighlights
         self.previousSizes = newSizes
         
         self.root = root
@@ -459,9 +470,10 @@ final class SunburstViewModel: ObservableObject {
         statusColor = .successGreen
         
         // Clear highlights after delay
-        if !changed.isEmpty {
+        if !changed.isEmpty || !removedHighlights.isEmpty {
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
                 self?.changedPaths = []
+                self?.removedHighlightPaths = []
             }
         }
     }
@@ -491,5 +503,26 @@ final class SunburstViewModel: ObservableObject {
             }
         }
         return nil
+    }
+
+    private func buildRemovedHighlightPaths(_ removed: Set<String>, existingPaths: Set<String>) -> Set<String> {
+        guard !removed.isEmpty else { return [] }
+        var highlights: Set<String> = []
+
+        for removedPath in removed {
+            var current = removedPath as NSString
+            while true {
+                let parent = current.deletingLastPathComponent
+                if parent.isEmpty || parent == current as String {
+                    break
+                }
+                if existingPaths.contains(parent) {
+                    highlights.insert(parent)
+                }
+                current = parent as NSString
+            }
+        }
+
+        return highlights
     }
 }

@@ -131,6 +131,12 @@ main {
   transition: opacity 0.2s;
 }
 
+#sunburst path.removed {
+  stroke: #f38ba8;
+  stroke-width: 2px;
+  opacity: 0.9;
+}
+
 #sunburst path:hover {
   opacity: 0.8;
 }
