@@ -38,7 +38,7 @@ Options:
   -p, --port <number>     Server port (default: 3210)
   -d, --depth <number>    Max directory depth to scan (default: 10)
   -i, --ignore <pattern>  Ignore patterns (can be repeated)
-  --no-ignore             Disable default ignore patterns
+  --no-ignore             Disable default ignore patterns (see [docs/IGNORE.md](docs/IGNORE.md))
   -o, --open              Open browser automatically
   -w, --watch             Enable file watching (default: true)
   --no-watch              Disable file watching

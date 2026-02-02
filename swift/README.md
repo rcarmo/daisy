@@ -41,12 +41,12 @@ make swift-dev  # watches parent directory
 
 ## Options
 
-| Option            | Description                              |
-| ----------------- | ---------------------------------------- |
-| `-d, --depth <n>` | Maximum directory depth (default: 10)    |
-| `--no-ignore`     | Disable default ignore patterns          |
-| `-h, --help`      | Show help                                |
-| `-v, --version`   | Show version                             |
+| Option            | Description                                                      |
+| ----------------- | ---------------------------------------------------------------- |
+| `-d, --depth <n>` | Maximum directory depth (default: 10)                            |
+| `--no-ignore`     | Disable [default ignore patterns](../docs/IGNORE.md)             |
+| `-h, --help`      | Show help                                                        |
+| `-v, --version`   | Show version                                                     |
 
 ## Architecture
 
